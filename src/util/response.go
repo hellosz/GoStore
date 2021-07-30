@@ -3,6 +3,7 @@ package util
 import (
 	"encoding/json"
 	"log"
+	"net/http"
 )
 
 // Response api请求返回消息结构
@@ -62,4 +63,15 @@ func (r Response) ToByte() []byte {
 // ToString 转换成字符串
 func (r Response) ToString() string {
 	return string(r.ToByte())
+}
+
+// 检查且在发生异常时返回
+func CheckAndResponse(err error, w http.ResponseWriter) bool {
+	if err != nil {
+		log.Print(err)
+		w.Write(FailtureResponse(err.Error(), nil).ToByte())
+		return false
+	}
+
+	return true
 }

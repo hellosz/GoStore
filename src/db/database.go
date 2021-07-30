@@ -11,7 +11,7 @@ import (
 func OnFileMetaUpdateFinished(fileSha1 string, fileName string, fileSize int64, location string) bool {
 	// 获取数据库链接
 	conn := conn.GetConn()
-	stmt, err := conn.Prepare("insert into tbl_file(file_sha1, file_name, file_size, file_addr, status) " +
+	stmt, err := conn.Prepare("insert ignore into tbl_file(file_sha1, file_name, file_size, file_addr, status) " +
 		"values (?, ?, ?, ?, 1)")
 	if err != nil {
 		fmt.Println(err.Error())

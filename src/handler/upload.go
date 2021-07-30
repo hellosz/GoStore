@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"GoStore/src/db"
 	"GoStore/src/meta"
 	"GoStore/src/util"
 	"encoding/json"
@@ -11,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"time"
 )
 
@@ -53,10 +55,20 @@ func Upload(w http.ResponseWriter, r *http.Request) {
 		fileMeta.FileSha1 = util.FileSha1(localFile)
 		ok := meta.UpdateFileMetaDB((fileMeta))
 		if !ok {
-			log.Fatalf("save filemeta to database failed")
+			log.Print("save filemeta to database failed")
+			w.WriteHeader(http.StatusInternalServerError)
+			return
 
 		}
 		// meta.UpdateFileMeta(fileMeta)
+		r.ParseForm()
+		userId, _ := strconv.Atoi(r.Form.Get("userId"))
+		// ok := db.UpdateUserFile()
+		ok = db.UpdateUserFile(int64(userId), fileMeta.FileSha1, fileMeta.FileName, fileMeta.FileSize)
+		if !ok {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
 
 		// 页面成功显示
 		// w.Write([]byte("method post handler"))
@@ -88,6 +100,30 @@ func QueryFile(w http.ResponseWriter, r *http.Request) {
 
 	// 返回结果
 	w.Write(data)
+}
+
+// QueryFileList 查询文件列表
+func QueryFileList(w http.ResponseWriter, r *http.Request) {
+	// 解析参数
+	r.ParseForm()
+	userId, err := strconv.Atoi(r.Form.Get("userId"))
+	if err != nil {
+		log.Print(err)
+		w.Write(util.ExceptionResponse(err.Error(), nil).ToByte())
+		return
+	}
+
+	// 查询结果
+	userFileList, err := db.QueryFileList(int64(userId))
+	if err != nil {
+		log.Print(err)
+		w.Write(util.ExceptionResponse(err.Error(), nil).ToByte())
+		return
+	}
+
+	// 返回结果
+	w.Write(util.SuccessResponse(userFileList).ToByte())
+
 }
 
 // Download 下载指定文件

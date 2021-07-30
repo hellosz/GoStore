@@ -43,7 +43,8 @@
 		<script src="https://cdn.jsdelivr.net/gh/kartik-v/bootstrap-fileinput@5.2.2/js/locales/LANG.js"></script>
 	</head>
 	<body>
-	<form action="/file/upload" method="post" enctype="multipart/form-data" accept-charset="utf-8">
+	<form action="/file/rapid_upload" method="post" enctype="multipart/form-data" accept-charset="utf-8">
+        <input type="hidden" value="9" name="userId" id=""/>
 		<input id="input-id" name="file" type="file" class="file" data-preview-file-type="text">
 	</form>	
 	</body>
