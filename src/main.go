@@ -26,6 +26,9 @@ func main() {
 	// 文件秒传接口
 	http.HandleFunc("/file/rapid_upload", handler.RapidUpload)
 
+	// 文件分片上传
+	http.HandleFunc("file/mp_upload/init", handler.InitMultipartUpload)
+
 	// 监听请求
 	err := http.ListenAndServe(":8090", nil)
 
