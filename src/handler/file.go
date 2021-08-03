@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	redisgo "github.com/gomodule/redigo/redis"
@@ -154,18 +155,19 @@ func MultipartUpload(w http.ResponseWriter, r *http.Request) {
 	for {
 		n, err := r.Body.Read(buf)
 
-		fmt.Println(string(buf[:n]), "buf", err)
-		if err != nil {
-			break
+		// 将请求内容写入到本地创建的分块文件中
+		if n > 0 {
+			_, err = file.Write(buf[:n])
+			if err != nil {
+				log.Print(err)
+				w.Write(util.FailtureResponse(err.Error(), nil).ToByte())
+				return
+			}
 		}
 
-		// 将请求内容写入到本地创建的分块文件中
-		fmt.Println(string(buf[:n]), "=")
-		_, err = file.Write(buf[:n])
+		// 文件结束，跳出循环
 		if err != nil {
-			log.Print(err)
-			w.Write(util.FailtureResponse(err.Error(), nil).ToByte())
-			return
+			break
 		}
 	}
 
@@ -211,13 +213,18 @@ func CompleteMultipartUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 读取文件信息 TODO
+	// 读取文件信息
 	// 读取目录下所有文件
-
+	ok, err := ValidMultiparUploadFile(filepath.Join(multipartUploadDir, traceId), mpFile.FileHash)
+	if err != nil || !ok {
+		log.Print(err)
+		w.Write(util.FailtureResponse("file hash verification failed", nil).ToByte())
+		return
+	}
 	// 文件合并
 
 	// 保存文件信息
-	ok := db.OnFileMetaUpdateFinished(mpFile.FileHash, mpFile.Filename, mpFile.FileSize, "")
+	ok = db.OnFileMetaUpdateFinished(mpFile.FileHash, mpFile.Filename, mpFile.FileSize, "")
 	if !ok {
 		w.Write(util.FailtureResponse("save file meta failed", nil).ToByte())
 		return
@@ -235,6 +242,51 @@ func CompleteMultipartUpload(w http.ResponseWriter, r *http.Request) {
 }
 
 // ValidMultiparUploadFile
-func ValidMultiparUploadFile(traceId string) {
+func ValidMultiparUploadFile(dir string, filehash string) (bool, error) {
+	// 获取目录的文件
+	files, err := ioutil.ReadDir(dir)
+	if err != nil {
+		return false, err
+	}
 
+	// 文件排序
+	sortedFiles := make(map[int]string)
+	for _, file := range files {
+		// 过滤掉临时文件
+		if strings.HasPrefix(file.Name(), "tempFile") {
+			continue
+		}
+		index, _ := strconv.Atoi(file.Name())
+		// 拼接文件路径
+		sortedFiles[index] = filepath.Join(dir, file.Name())
+	}
+
+	fmt.Println(sortedFiles, "sorted files")
+
+	// 合并文件
+	// 创建临时文件，用作保存合并的数据
+	mergedFile, _ := ioutil.TempFile(dir, "tempFile")
+	defer mergedFile.Close()
+
+	for i := 1; i <= len(sortedFiles); i++ {
+		particialFile, ok := sortedFiles[i]
+		if !ok {
+			continue
+		}
+
+		// 打开文件
+		data, err := ioutil.ReadFile(particialFile)
+		if err != nil {
+			return false, err
+		}
+
+		mergedFile.Write(data)
+	}
+
+	// 校验文件是否正确
+	mergedFile.Seek(0, 0)
+	tmpFilehash := util.FileSha1(mergedFile)
+
+	fmt.Println("tempFile:", tmpFilehash, "uploadFile", filehash)
+	return tmpFilehash == filehash, nil
 }
